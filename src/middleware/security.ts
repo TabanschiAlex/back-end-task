@@ -1,16 +1,16 @@
 import { RequestHandler } from 'express';
 
 import type { SequelizeClient } from '../sequelize';
-import type { User } from '../repositories/types';
 
-import { UnauthorizedError, ForbiddenError, NotImplementedError } from '../errors';
-import { isValidToken, extraDataFromToken } from '../security';
+import { ForbiddenError, UnauthorizedError } from '../errors';
 import { UserType } from '../constants';
+import { extraDataFromToken, isValidToken } from '../security';
+import { RequestAuth } from '../interfaces/RequestAuth';
 
 export function initTokenValidationRequestHandler(sequelizeClient: SequelizeClient): RequestHandler {
   return async function tokenValidationRequestHandler(req, res, next): Promise<void> {
     try {
-      const { models } = sequelizeClient;
+      const {models} = sequelizeClient;
 
       const authorizationHeaderValue = req.header('authorization');
       if (!authorizationHeaderValue) {
@@ -30,15 +30,14 @@ export function initTokenValidationRequestHandler(sequelizeClient: SequelizeClie
         throw new UnauthorizedError('AUTH_TOKEN_INVALID');
       }
 
-      const { id } = extraDataFromToken(token);
-
+      const {id} = extraDataFromToken(token);
       const user = await models.users.findByPk(id);
+
       if (!user) {
         throw new UnauthorizedError('AUTH_TOKEN_INVALID');
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-      (req as any).auth = {
+      (req as unknown as { auth: RequestAuth }).auth = {
         token,
         user,
       } as RequestAuth;
@@ -52,12 +51,43 @@ export function initTokenValidationRequestHandler(sequelizeClient: SequelizeClie
 
 // NOTE(roman): assuming that `tokenValidationRequestHandler` is placed before
 export function initAdminValidationRequestHandler(): RequestHandler {
-  return function adminValidationRequestHandler(req, res, next): void {
-    throw new NotImplementedError('ADMIN_VALIDATION_NOT_IMPLEMENTED_YET');
+  return function tokenValidationRequestHandler(req, res, next): void {
+    try {
+      const {auth} = req as unknown as { auth: RequestAuth };
+
+      if (!auth.user) {
+        throw new UnauthorizedError('AUTH_MISSING');
+      }
+
+      if (auth.user.type !== UserType.ADMIN) {
+        throw new ForbiddenError('FORBIDDEN');
+      }
+
+      return next();
+    } catch (error) {
+      return next(error);
+    }
   };
+
 }
 
-export interface RequestAuth {
-  token: string;
-  user: User;
+export function initScopeValidationRequestHandler(): RequestHandler {
+  return function validationRequestHandler(req, res, next): void {
+    try {
+      const {auth} = req as unknown as { auth: RequestAuth };
+
+      if (!auth.user) {
+        throw new UnauthorizedError('AUTH_MISSING');
+      }
+
+      if (auth.user.type !== UserType.ADMIN) {
+        auth.scope = UserType.BLOGGER;
+      }
+
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  };
+
 }

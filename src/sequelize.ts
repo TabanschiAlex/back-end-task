@@ -1,18 +1,20 @@
-import { Sequelize, Options } from 'sequelize';
+import { Sequelize } from 'sequelize';
 
-import type { UsersModel } from './repositories/types';
+import type { PostsModel, UsersModel } from './repositories/types';
 
-import { setupUsersModel } from './models';
+import { setupPostsModel, setupUsersModel } from './models';
+import { sequelize_config } from './config/sequilize_config';
 
 const postsModelName = 'posts';
 const usersModelName = 'users';
 
-export async function initSequelizeClient(params: SetupSequelizeParams): Promise<SequelizeClient> {
-  const { dialect, host, port, username, password, database } = params;
+export async function initSequelizeClient(): Promise<SequelizeClient> {
+  const { dialect, host, port, username, password, database } = sequelize_config;
 
   const sequelizeClient = new Sequelize({ dialect, host, port, username, password, database, logging: false });
 
   setupUsersModel(usersModelName, sequelizeClient);
+  setupPostsModel(postsModelName, sequelizeClient);
 
   associateModels(sequelizeClient.models as unknown as SequelizeModels);
 
@@ -31,10 +33,9 @@ function associateModels(models: SequelizeModels): void {
   }
 }
 
-type SetupSequelizeParams = Pick<Options, 'dialect' | 'host' | 'port' | 'username' | 'password' | 'database'>;
-
 export interface SequelizeModels {
   [usersModelName]: UsersModel;
+  [postsModelName]: PostsModel;
 }
 
 interface ModelWithPossibleAssociations {
