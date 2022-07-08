@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  api-adverts:
+    image: nginx:latest
+    labels:
+      - "traefik.enable=true"
+    volumes:
+      - .:/var/www/html:delegated
+    networks:
+      - web
+
+networks:
+  web:
+    external: true
